@@ -5,20 +5,22 @@ def SuvjVarAnalys(df, allTargets, vecTraits, n):
     import pdb
     import numpy as np
     import pandas as pd
+    import RemoveSame
     import matplotlib.pyplot as plt
 
-    # initialize new DataFrame with the right Columns
+    # # initialize new DataFrame with the right Columns
     Columns = []
     for Target in allTargets:
         Columns.append(Target + '_mean')
-    Index = range(1, df.shape[0] + 1)
-    df_new = pd.DataFrame(index=Index, columns=Columns)
+    index = range(0, df.shape[0])
+    df_new = pd.DataFrame(index= index, columns=Columns)
 
     # Distinction between pos and negative Traits
     endpos = int(len(vecTraits) / 2)
     TraitsPos = vecTraits[0:endpos]
     TraitsNeg = vecTraits[endpos: len(vecTraits)]
 
+    dict_new = {}
     # loop over Targets and Traits to create a vector with positive and negative ratings
     for Target in allTargets:
         veckeyPos,veckeyNeg = [], []
@@ -34,13 +36,14 @@ def SuvjVarAnalys(df, allTargets, vecTraits, n):
                 else:
                     veckeyNeg.append(Target + "_" + Trait)
 
-
         # transform negative to the inverse
-        df[veckeyNeg] = 100 - df[veckeyNeg]
 
-        # calculate variance
-        # import pdb
+        # df.loc[veckeyNeg] = 100 - df.loc[veckeyNeg]
+        # print(df.loc[veckeyNeg].head())
+        df[veckeyNeg] = 100 - df[veckeyNeg]
+        # print(df[veckeyNeg].head())
         # pdb.set_trace()
+        # calculate variance
         var = pd.DataFrame(np.nanvar(df[veckeyNeg+veckeyPos], axis= 1))
         mean = pd.DataFrame(np.nanmean(df[veckeyNeg + veckeyPos], axis=1))
         # save variance

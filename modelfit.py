@@ -1,4 +1,4 @@
-def RegressionFit(X, y):
+def RegressionFit(X, y, train_size, randomstate):
     """ This function will fit a regression model to a training set and test it on the testing
     set. The model is fitted per Key which is a label """
 
@@ -9,13 +9,10 @@ def RegressionFit(X, y):
     from sklearn.model_selection import cross_val_score
 
     # Create training and test sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size = train_size, random_state=randomstate)
 
     # Create the regressor: reg_all
-    reg_all = LinearRegression()
-
-    # Compute 5-fold cross-validation scores: cv_scores
-    cv_scores = cross_val_score(reg_all, X_train, y_train, cv=5)
+    reg_all = LinearRegression(normalize= True)
 
     # Print the 5-fold cross-validation scores
     #print(cv_scores)
@@ -38,58 +35,41 @@ def RegressionFit(X, y):
     #print("R^2: {}".format(reg_all.score(X_test, y_test)))
     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
     #print("Root Mean Squared Error: {}".format(rmse))
+    if train_size == 0.3:
+        # Compute 5-fold cross-validation scores: cv_scores
+        cv_scores = cross_val_score(reg_all, X_train, y_train, cv=5)
+        score_out = cv_scores
+    else:
+        # score_out = reg_all.score(X_test, y_test)
+        score_out = reg_all.score(X_test, y_test)
 
-    return cv_scores, rmse, reg_all
+    return score_out, rmse, reg_all
 
-def Knearest(df, Key):
-    """ This function will fit a KNeighborsClassifier model to a training set
-    and test it on the testing set. 
-    The model is fitted per Key which is a label """
-
-    import StringSplit
-    from sklearn.neighbors import KNeighborsClassifier
-    from sklearn.model_selection import train_test_split
-
-    label, label_title = StringSplit.StringSplit(Key)
-
-    X = [df[label[1]].values, df[label[2]].values]
-    y = df[label[3]].values
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size= 0.3, random_state= 21)
-
-    knn= KNeighborsClassifier(n_neighbors= 6)
-
-    knn.fit(X_train, y_train)
-
-    y_pred = knn.predict(X_test)
-    print("Test set predictions:\n {}".format(y_pred))
-
-    score = knn.score(X_test, y_test)
-
-    return score
-
-def RidgeRegres(X, y):
+def RidgeRegres(X, y, train_size, randomstate):
     from sklearn.linear_model import Ridge
     from sklearn.model_selection import train_test_split
     from sklearn.metrics import mean_squared_error
     import numpy as np
     from sklearn.model_selection import cross_val_score
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.3, random_state = 42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size = train_size, random_state = randomstate)
     ridge = Ridge(alpha=0.1, normalize=True)
-
-    # Compute 5-fold cross-validation scores: cv_scores
-    cv_scores = cross_val_score(ridge, X_train, y_train, cv=5)
 
     ridge.fit(X_train, y_train)
     ridge_pred = ridge.predict(X_test)
 
     #get RMSE
     rmse = np.sqrt(mean_squared_error(y_test, ridge_pred))
-    #scores = ridge.score(X_test, y_test)
 
-    return cv_scores, rmse, ridge
+    if train_size == 0.3:
+        # Compute 5-fold cross-validation scores: cv_scores
+        cv_scores = cross_val_score(ridge, X_train, y_train, cv=5)
+        score_out = cv_scores
+    else:
+        score_out = ridge.score(X_test, y_test)
+    return score_out, rmse, ridge
 
-def LassoRegres(X, y):
+def LassoRegres(X, y, train_size, randomstate):
     """ Deze functie bekijkt hoe goed een lasso regressie functie past op de data
     """
 
@@ -100,11 +80,8 @@ def LassoRegres(X, y):
     import numpy as np
     from sklearn.model_selection import cross_val_score
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y,test_size = 0.3, random_state = 42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y,train_size = train_size, random_state = randomstate)
     lasso = Lasso(alpha=0.1, normalize=True)
-
-    # Compute 5-fold cross-validation scores: cv_scores
-    cv_scores = cross_val_score(lasso, X_train, y_train, cv=5)
 
     lasso.fit(X_train, y_train)
     lasso_pred = lasso.predict(X_test)
@@ -113,38 +90,26 @@ def LassoRegres(X, y):
     # get RMSE
     rmse = np.sqrt(mean_squared_error(y_test, lasso_pred))
 
-    return cv_scores, rmse, lasso
+    if train_size == 0.3:
+        # Compute 5-fold cross-validation scores: cv_scores
+        cv_scores = cross_val_score(lasso, X_train, y_train, cv=5)
+        score_out = cv_scores
+    else:
+        score_out = lasso.score(X_test, y_test)
 
-def WeightAver(X, y):
+    return score_out, rmse, lasso
+
+def WeightAver(X, y, train_size, randomstate):
     from sklearn.model_selection import train_test_split
     import numpy as np
     from sklearn.metrics import mean_squared_error
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.3, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=train_size, random_state=randomstate)
 
     #initialize possible weights
     weights_one = np.linspace(0, 1, 100)
     weights_two = 1 - weights_one
 
-    # this used to do weights per subject
-    # Indiv_weights_one = []
-    # Indiv_weights_two = []
-    # for n in range(len(X_train)):
-    #     new_mean = X_train[n,0] * weights_one + X_train[n,1] * weights_two
-    #     difference = list(abs(y_train[n] - new_mean))
-    #     Indiv_weights_one.append(weights_one[difference.index(min(difference))])
-    #     Indiv_weights_two.append(weights_one[difference.index(min(difference))])
-    #
-
-    # import matplotlib.pyplot as plt
-    # plt.figure()
-    # plt.subplot(2,1,1)
-    # plt.hist(Indiv_weights_one, color='red', label= 'occupation')
-    # plt.subplot(2, 1, 2)
-    # plt.hist(Indiv_weights_two, color= 'blue', label= 'name')
-    # plt.show()
-    # population approach
-    # get the means
     X_train_means = np.mean(X_train, axis=0)
     y_train_mean = np.mean(y_train, axis=0)
 
@@ -160,9 +125,9 @@ def WeightAver(X, y):
     rmse = mean_squared_error(y_test, WeightAver_pred)
 
     mean_new = new_mean[difference.index(min(difference))]
-    return WeightAver_pred, rmse
+    return WeightAver_pred, rmse, weights
 
-def SelectModel(df, Key, count, performance):
+def SelectModel(df, Key, count, performance, train_size, randomstate):
     """ This selects the best model from the options used below and
     prints the % correctly classified and the used model
     """
@@ -177,15 +142,14 @@ def SelectModel(df, Key, count, performance):
         mean = np.mean(df[label[n]], axis=0)
         df[label[n]] = df[label[n]].replace(to_replace= np.nan, value= mean)
 
-    X = np.array([df[label[3]].dropna(), df[label[2]].dropna()])
+    coef_names =[label[2], label[3]]
+    X = np.array([df[label[2]].dropna(), df[label[3]].dropna()])
     y = df[label[1]].dropna().values
     X = X.T
-
-    Regres_scores, Regres_rmse, regress = RegressionFit(X, y)
-    #Knearest(df, Key)
-    Ridge_scores, Ridge_rmse, ridge = RidgeRegres(X, y)
-    Lasso_scores, Lasso_rmse, lasso = LassoRegres(X, y)
-    # WeightAver_scores, WeightAver_rmse = WeightAver(X, y)
+    Regres_scores, Regres_rmse, regress = RegressionFit(X, y, train_size, randomstate)
+    Ridge_scores, Ridge_rmse, ridge = RidgeRegres(X, y, train_size, randomstate)
+    Lasso_scores, Lasso_rmse, lasso = LassoRegres(X, y, train_size, randomstate)
+    # WeightAver_scores, WeightAver_rmse, weights = WeightAver(X, y)
 
     # print("model results")
     # print("\n")
@@ -201,19 +165,33 @@ def SelectModel(df, Key, count, performance):
     # print("Average of CV: {}".format(np.mean(Lasso_scores)))
     # print("RMSE : {}".format(Lasso_rmse))
 
+    # import pdb
+    # print(Key)
+    # print(Regres_scores)
+    # print(Ridge_scores)
+    # print(Lasso_scores)
+    # import pdb
+    # pdb.set_trace()
+
     vecScores = [np.mean(Regres_scores), np.mean(Ridge_scores), np.mean(Lasso_scores)]
+    # print(vecScores)
     vecRMSE = [Regres_rmse, Ridge_rmse, Lasso_rmse]
-    modelsNames = ['Linear Regress', 'Ridge', 'Lasso']
-    models = [regress, ridge, lasso]
-    count[vecScores.index(min(vecScores))] += 1
+    # print(vecRMSE)
+    modelsNames = ['Regress', 'Ridge', 'Lasso']
+    modelsNames1 = ['Regress']
+    import pandas as pd
+    models = pd.DataFrame([regress], index=modelsNames1)
+    count[:,0][vecScores.index(max(vecScores))] += 1
+    count[:,1][vecRMSE.index(min(vecRMSE))] += 1
 
-    if abs(np.mean(Regres_scores)) < 0.3:
-        performance[0][Key] = np.mean(Regres_scores)
-    elif abs(np.mean(Regres_scores)) < 0.6 and abs(np.mean(Regres_scores)) > 0.3:
-        performance[1][Key] = np.mean(Regres_scores)
-    elif abs(np.mean(Regres_scores)) > 0.6 and abs(np.mean(Regres_scores)) < 0.7:
-        performance[2][Key] = np.mean(Regres_scores)
-    elif abs(np.mean(Regres_scores)) > 0.7:
-        performance[3][Key] = np.mean(Regres_scores)
+    R_sqr_best = abs(np.mean(vecScores[vecScores.index(max(vecScores))]))
+    if R_sqr_best < 0.3:
+        performance[0][Key] = R_sqr_best
+    elif R_sqr_best < 0.6 and R_sqr_best > 0.3:
+        performance[1][Key] = R_sqr_best
+    elif R_sqr_best > 0.6 and R_sqr_best < 0.7:
+        performance[2][Key] = R_sqr_best
+    elif R_sqr_best > 0.7:
+        performance[3][Key] = R_sqr_best
 
-    return count, modelsNames, performance, models
+    return count, modelsNames, performance, models, vecScores,coef_names
