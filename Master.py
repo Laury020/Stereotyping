@@ -1,4 +1,3 @@
-
 import pandas as pd
 import os
 import numpy as np
@@ -11,6 +10,9 @@ import Individual as Ind
 import modelfit
 import StringSplit
 import pdb
+import matplotlib.pyplot as plt
+
+Saving = False
 
 # load the data in
 os.chdir("C:/Users/Thomas Dolman/Documents/UvA/MasterStage2_MingHsu/Onderzoek/Data/Integration_March_1Block")
@@ -28,144 +30,342 @@ os.chdir("C:/Users/Thomas Dolman/Documents/UvA/MasterStage2_MingHsu/Onderzoek/Da
 
 AllData = [df_feb, df_march1block, df_marchmultblock, df_names]
 Names = ["Febuary", "March_1block", "March_4block", 'May_Names']
+# pilot, second, first and third study
 
 # preprocess the data, first get Ravencorrect. Use this to throw participants away
 # remove the Raven questions and combine the different occurences of the same Target
-AllData_ready, AllData_warmth, AllUniTarg = [], [], []
+AllData_new, AllData_warmth, AllUniTarg, AllData_CorrVals, AllData_Pvals = [], [], [], [], []
+CorrVals, Pvals, = {}, {}
 for n in range(len(AllData)):
     df = AllData[n]
     allTargets, allTraits, vecUniTargets = getTargets_Traits.getTargets_Traits(n)
     AllUniTarg.append(vecUniTargets)
-    if n < 2:
-        Samevalids = RemoveSame.RemoveSame(df, allTargets, allTraits)
-        df_new = RemoveSame.selectUsers(df, Samevalids, Names[n])
-    else:
-        Ravenvalids = Rave.RavenCorr(df)
-        df = Rave.selectUsers(df, Ravenvalids, Names[n])
-        df_new = Rave.removeRaven(df)
 
     if n < 3:
-        df_ready = CombineTraits.combineTraits(df_new, allTargets, allTraits, n)
+        df_ready = CombineTraits.combineTraits(df, allTargets, allTraits, n)
     else:
-        df_ready = df_new
+        df_ready = df
 
-    AllData_ready.append(df_ready)
-    # pdb.set_trace()
+    if n < 2:
+        Samevalids = RemoveSame.RemoveSame(df_ready, 'all', allTargets, allTraits, n)
+        df_new = RemoveSame.selectUsers(df_ready, Samevalids, Names[n], 'all')
+
+        Samevalids = RemoveSame.RemoveSame(df_ready, 'Targ', allTargets, allTraits, n)
+        df_new = RemoveSame.selectUsers(df_ready, Samevalids, Names[n], 'Targ')
+    elif n == 2:
+        Ravenvalids = Rave.RavenCorr(df)
+        df_new = Rave.selectUsers(df_ready, Ravenvalids, Names[n])
+        # add remove same based upon std scores
+        Samevalids = RemoveSame.RemoveSame(df_new, 'all', allTargets, allTraits, n)
+        df_new = RemoveSame.selectUsers(df_new, Samevalids, Names[n], 'all')
+        Samevalids = RemoveSame.RemoveSame(df_new, 'Targ', allTargets, allTraits, n)
+        df_new = RemoveSame.selectUsers(df_new, Samevalids, Names[n], 'Targ')
+    else:
+        Ravenvalids = Rave.RavenCorr(df)
+        df_new = Rave.selectUsers(df_ready, Ravenvalids, Names[n])
+
+    print('People excluded: ' + str(len(df) - len(df_new)))
+    print('Original subjects: ' + str(len(df)))
+    AllData_new.append(df_new)
+
     # calculate the std values over the personality traits and save this in Target_std
-    df_warm_var = Ind.SuvjVarAnalys(df_ready, allTargets, allTraits, n)
+    df_warm_var = Ind.SuvjVarAnalys(df_new, allTargets, allTraits, n)
 
     for Key in df_warm_var.keys():
-        df_warm_var[Key] = df_warm_var[Key].replace(np.nan, np.mean(df_warm_var[Key]))
+        df_val = df_warm_var[Key].value_counts(dropna=False)
+        if df_val[np.nan] > 5:
+            df_warm_var[Key] = df_warm_var[Key].dropna()
+        else:
+            df_warm_var[Key] = df_warm_var[Key].replace(np.nan, np.mean(df_warm_var[Key]))
+
+    percIncl = (len(df_warm_var) / len(df)) * 100
+    print(Names[n])
+    print("users included based upon all criteria: " + str(percIncl) + "%")
 
     AllData_warmth.append(df_warm_var)
 
-    for Key in df_warm_var.keys():
-        if Key in vecUniTargets:
-            continue
-        elif Key[-1] == 'r':
-            continue
-        else:
-            plot.meanWarmthProba(df_warm_var, Key)
-            plot.plotWarmteHist(df_warm_var, Key)
-            plot.ChangeWarmthHist(df_warm_var, Key)
-            plot.ScatterWarmth(df_warm_var, Key)
+    if Saving:
+        for Key in df_warm_var.keys():
+            if Key in vecUniTargets:
+                continue
+            elif Key[-1] == 'r':
+                continue
+            else:
+                plot.meanWarmthProba(df_warm_var, Key, Names[n])
+                plot.plotWarmteHist(df_warm_var, Key, Names[n])
+                plot.ChangeWarmthHist(df_warm_var, Key, Names[n])
+                CorrValues, PValuess = plot.ScatterWarmth(df_warm_var, Key, Names[n])
+                try:
+                    CorrVals[Key]
+                    try:
+                        CorrVals[Key + '.1']
+                        pdb.set_trace()
+                    except:
+                        CorrVals[Key + '.1'] = CorrValues
+                        Pvals[Key + '.1'] = PValuess
+                except:
+                    CorrVals[Key] = CorrValues
+                    Pvals[Key] = PValuess
 
-    plot.scatWarmthInt(df_warm_var, vecUniTargets)
-    plot.plotTargetVar(df_warm_var, vecUniTargets)
+        plot.scatWarmthInt(df_warm_var, vecUniTargets, Names[n])
+        plot.plotTargetVar(df_warm_var, vecUniTargets, Names[n])
 
-# for n in range(len(AllData_warmth)):
-#     df = AllData_warmth[n]
-#     Key = df.keys()[0]
-#     label, label_title = StringSplit.StringSplit(Key)
-#     print("Key: " + Key)
-#     print("Labels: {}".format(label))
-# //
+import models_testing
 
-# calculate warmth over personality traits and save this in Target_mean
-# df_warmth = getWarmthValue.getWarmthValue(df_ready, allTargets, allTraits)
+vecTrainSize = np.linspace(0.03, 0.5, 100)
 
-# initialize some values which will store model performance. These will be filled in plotBayesProb
-bestmodel, difference, rmse = {}, {}, {}
-labels = ['Bayes_rmse', 'Aver_rmse', 'Weight_rmse', 'Aver_diff', 'Bayes_diff', 'Weight_diff']
-for l in labels:
-    bestmodel[l] = 0
-count = np.array(np.zeros((3, 1)))
-performance, scores = {},{}
-for n in range(4):
-    performance[n] = {}
+bestmodel_file, RMSE_file, diff_file, Rsq_file = {}, {}, {}, {}
+# RMSE_file_plt, diff_file_plt, Rsq_file_plt = {},{},{}
+allstates = range(1,501)
+# allstates = range(1,101)
+# allstates = range(1, 11)
+# allstates = range(1, 2)
 
-for Key in AllData_warmth[2].keys():
-    # this section ensures not all keys are used in the functions.
-    # this increases efficiency of the code
-    vecUniTargets = AllUniTarg[2]
-    if Key in vecUniTargets:
-        continue
-    elif Key[-1] == 'r':
-        continue
-
-    print(Key)
-    # plot.plotWarmteHist(df_warmth, Key)
-    # plot.ChangeWarmthHist(df_warmth, Key)
-    # plot.meanWarmthProba(df_warmth, Key)
-    print("\n")
-    count, modelNames, performance, models = modelfit.SelectModel(AllData_warmth[2], Key, count, performance)
-    # plot.plotWarmteHist(df_warmth, Key)
-    rmse, bestmodel, difference = plot.plotBayesProb(AllData_warmth[2], Key, rmse, bestmodel, difference)
-
-    for n in range(len(AllData_warmth)):
-        # loop over the other questionaires and check if the model works there as well
-        if n == 2:
-            continue
-        vecUniTargets = AllUniTarg[n]
-        df = AllData_warmth[n]
+# allstates = [39]
+# vecTrainSize = [0.3]
+for types in [2]:
+    for randomState in allstates:
+        scores, allModels, allDeviation, bestmodel, outof_score = models_testing.all(AllData_warmth, AllUniTarg,
+                                                                                     vecTrainSize, randomState, types)
+        print("random state = " + str(randomState))
+        bestmodel_file[randomState] = bestmodel
+        Trainsize = 70.64
+        RMSE_file[randomState] = scores[0].loc[Trainsize, :]
+        diff_file[randomState] = scores[1].loc[Trainsize, :]
+        Rsq_file[randomState] = scores[2].loc[Trainsize, :]
+        # RMSE_file_plt[randomState] = scores[0]
+        # diff_file_plt[randomState] = scores[1]
+        # Rsq_file_plt[randomState] = scores[2]
         # pdb.set_trace()
-        for Key_test in df.keys():
+        try:
+            RMSE_file_plt1 = RMSE_file_plt1 + scores[0]
+        except NameError:
+            RMSE_file_plt1 = scores[0]
+        try:
+            diff_file_plt1 = diff_file_plt1 + scores[1]
+        except NameError:
+            diff_file_plt1 = scores[1]
+        try:
+            Rsq_file_plt1 = Rsq_file_plt1 + scores[2]
+        except NameError:
+            Rsq_file_plt1 = scores[2]
 
-            if Key_test in vecUniTargets:
+        train_size = 0.3
+        preset = [{}, {}, {}, {}, {}]
+        for Key in AllData_warmth[2].keys():
+            # pdb.set_trace()
+            if Key[-1] == 'r':
                 continue
-            elif Key_test[-1] == 'r':
+            if Key in AllUniTarg[2]:
                 continue
-            try:
-                scores[Key]
-            except KeyError:
-                scores[Key] = {}
+            rmse, bestmodel, difference, allDeviation, df_weights, score, proba, outof_score = plot.plotBayesProb(
+                AllData_warmth[2], Key, preset, train_size, randomState, types, allDeviation, AllData_warmth,
+                AllUniTarg)
 
-            try:
-                label, label_title = StringSplit.StringSplit(Key_test)
-                label2, label_title2 = StringSplit.StringSplit(Key)
-            except ValueError:
-                pdb.set_trace()
+        df_score = pd.DataFrame(score)
+        df_score_outof = pd.DataFrame(outof_score)
+        try:
+            score_file = score_file + df_score
+        except NameError:
+            score_file = df_score
+        try:
+            score_out_file = score_out_file + df_score_outof
+        except NameError:
+            score_out_file = df_score_outof
 
-            # if label[3] in label2[3] or label[2] in label2[2]:
+            # pdb.set_trace()
+            # print(Rsq_file_plt1.iloc[0, :])
+            # print(score_file.mean(axis=1))
 
-            X = np.array([df[label[3]].dropna(), df[label[2]].dropna()])
-            y = df[label[1]].dropna().values
-            X = X.T
-            lasso_pred = models[2].predict(X)
-            scores[Key][Key_test] = models[2].score(X, y)
-            # print("the Key on which the model is fitted: {}".format(Key))
-            # print("the label of the tested data: {}".format(Key_test))
-            # print(scores[Key][Key_test])
+    df_bestModel = pd.DataFrame(bestmodel_file)
+    df_bestModel_out = df_bestModel.sum(axis=1)
+    df_bestModel_out = pd.DataFrame(df_bestModel_out)
+    df_bestModel_out['ratio'] = df_bestModel_out / df_bestModel.sum(axis=1).sum(axis=0)
+    df_bestModel_out.columns = ['Summed scores', 'ratio']
+    df_RMSE = pd.DataFrame(RMSE_file)
+    df_RMSE_out = df_RMSE.mean(axis=1)
+    df_RMSE_out = pd.DataFrame(df_RMSE_out)
+    df_RMSE_out['ratio'] = df_RMSE_out / df_RMSE.sum(axis=1).sum(axis=0)
+    df_RMSE_out.columns = ['average RMSE', 'ratio']
+    df_Diff = pd.DataFrame(diff_file)
+    df_Diff_out = df_Diff.mean(axis=1)
+    df_Diff_out = pd.DataFrame(df_Diff_out)
+    df_Diff_out['ratio'] = df_Diff_out / df_Diff.sum(axis=1).sum(axis=0)
+    df_Diff_out.columns = ['average difference', 'ratio']
+    df_Rsq = pd.DataFrame(Rsq_file)
+    df_Rsq_out = df_Rsq.mean(axis=1)
+    df_Rsq_out = pd.DataFrame(df_Rsq_out)
+    df_Rsq_out['ratio'] = df_Rsq_out / df_Rsq.sum(axis=1).sum(axis=0)
+    df_Rsq_out.columns = ['average Rsquared', 'ratio']
 
-print("\n")
-print(rmse)
-print(bestmodel)
-print(difference)
-print("\n")
-count = list(count)
-print("best model overall is : {}".format(modelNames[count.index(max(count))]))
-print(count)
-print("targets with poor R^2 : {}".format(performance[0]))
-print("total {}".format(len(performance[0])))
-print("targets with medium R^2 : {}".format(performance[1]))
-print("total {}".format(len(performance[1])))
-print("targets with good R^2 : {}".format(performance[2]))
-print("total {}".format(len(performance[2])))
-print("targets with very good R^2 : {}".format(performance[3]))
-print("total {}".format(len(performance[3])))
+    Rsq_file_plt1 = Rsq_file_plt1 / len(allstates)
+    df_Rsq_file_plt = pd.DataFrame(Rsq_file_plt1)
+    # df_Rsq_file_plt_out = df_Rsq_file_plt.mean(axis=1)
+    # df_Rsq_file_plt_out = pd.DataFrame(df_Rsq_file_plt_out)
 
-# write scores to csv file
-df_out = pd.DataFrame(scores)
-filename = 'Out_of_sample_Predictions.csv'
-os.chdir("C:/Users/Thomas Dolman/Documents/UvA/MasterStage2_MingHsu/Onderzoek/Data/Overall")
-df_out.to_csv(filename)
+    diff_file_plt1 = diff_file_plt1 / len(allstates)
+    df_diff_file_plt = pd.DataFrame(diff_file_plt1)
+    # df_diff_file_plt_out = df_diff_file_plt.mean(axis=1)
+    # df_diff_file_plt_out = pd.DataFrame(df_diff_file_plt_out)
+
+    RMSE_file_plt1 = RMSE_file_plt1 / len(allstates)
+    df_RMSE_file_plt = pd.DataFrame(RMSE_file_plt1)
+    # df_RMSE_file_plt_out = df_RMSE_file_plt.mean(axis=1)
+    # df_RMSE_file_plt_out = pd.DataFrame(df_RMSE_file_plt_out)
+
+    os.chdir("C:/Users/Thomas Dolman/Documents/UvA/MasterStage2_MingHsu/Onderzoek/Data/Overall/ModelScores")
+    # pdb.set_trace()
+    df_Rsq_file_plt = df_Rsq_file_plt.rename(columns={"Aver_score": 'Average', "BayPop_score": 'Bayes test population',
+                                    "BayTotalPop_score": 'Bayes total population', "Bayes_score":'Bayes subject wise', "Regress_score":'Regression'})
+    df_Rsq_file_plt.plot()
+    plt.xlabel('train size')
+    plt.ylabel('R^2 predictive power')
+    plt.savefig('Average_R_squared_' + str(len(allstates)) + '_.eps', format='eps')
+    plt.savefig('Average_R_squared_' + str(len(allstates)) + '_.png', format='png')
+    df_diff_file_plt = df_diff_file_plt.rename(columns={"Aver_diff": 'Average', "BayPop_diff": 'Bayes test population',
+                                    "BayTotalPop_diff": 'Bayes total population', "Bayes_diff": 'Bayes subject wise',
+                                    "Regres_diff": 'Regression'})
+    df_diff_file_plt.plot()
+    plt.xlabel('train size')
+    plt.ylabel('Difference to mean')
+    plt.savefig('Average_Difference_' + str(len(allstates)) + '_.eps', format='eps')
+    plt.savefig('Average_Difference_' + str(len(allstates)) + '_.png', format='png')
+    df_RMSE_file_plt = df_RMSE_file_plt.rename(columns={"Aver_rmse": 'Average', "BayPop_rmse": 'Bayes test population',
+                                    "BayTotalPop_rmse": 'Bayes total population', "Bayes_rmse": 'Bayes subject wise',
+                                    "Regress_rmse": 'Regression'})
+    df_RMSE_file_plt.plot()
+    plt.xlabel('train size')
+    plt.ylabel('RMSE')
+    plt.savefig('Average_RMSE_' + str(len(allstates)) + '_.eps', format='eps')
+    plt.savefig('Average_RMSE_' + str(len(allstates)) + '_.png', format='png')
+
+    # save the dataframes
+    os.chdir("C:/Users/Thomas Dolman/Documents/UvA/MasterStage2_MingHsu/Onderzoek/Data/Overall")
+    vecType = ['_allmod_ttest', '_allmod_NOttest', '_submod_NOttest', '_submod_ttest']
+    filename = 'bestmodel_' + 'n' + str(len(allstates)) + vecType[types] + '.csv'
+    df_bestModel_out.to_csv(filename)
+    filename = 'RMSE_' + 'n' + str(len(allstates)) + vecType[types] + '.csv'
+    df_RMSE_out.to_csv(filename)
+    filename = 'Difference_' + 'n' + str(len(allstates)) + vecType[types] + '.csv'
+    df_Diff_out.to_csv(filename)
+    filename = 'Rsquared_' + 'n' + str(len(allstates)) + vecType[types] + '.csv'
+    df_Rsq_out.to_csv(filename)
+
+indexSampSize = len(AllData_warmth[2]) * vecTrainSize
+indexSampSize = indexSampSize.round(2)
+vecTrainSize[indexSampSize == 70.64]
+
+# statistical analyses.....
+# analysis of the different surveys
+vecTrainSize = [0.3]
+if len(vecTrainSize) == 1:
+    import stats_Overall
+
+    stats_Overall.test_means(AllData_warmth, vecUniTargets)
+
+# Save the values if one test size is used, not a vector
+
+if len(vecTrainSize) == 1:
+    # write scores to csv file
+    # pdb.set_trace()
+    df_out_score = score_out_file / len(allstates)
+    # df_out_score = pd.DataFrame(score_out_file1)
+    # pdb.set_trace()
+    filename = 'Out_of_sample_Predictions' + str(len(allstates)) + '.csv'
+    os.chdir("C:/Users/Thomas Dolman/Documents/UvA/MasterStage2_MingHsu/Onderzoek/Data/Overall")
+    df_out_score.to_csv(filename)
+    print(filename + '  saved')
+
+    df_in_score = score_file / len(allstates)
+    # df_in_score = pd.DataFrame(score_file1)
+    filename = 'In_sample_Predictions' + str(len(allstates)) + '.csv'
+    os.chdir("C:/Users/Thomas Dolman/Documents/UvA/MasterStage2_MingHsu/Onderzoek/Data/Overall")
+    df_in_score.to_csv(filename)
+
+    plt.close('all')
+
+    # save the model coeffs and the relation plot
+    import seaborn as sns
+    # pdb.set_trace()
+    modelselect = 0.30060606060606054
+    df_Models = pd.DataFrame(allModels[modelselect])
+    df_Models = df_Models.T
+    sns.lmplot(x='Bayes', y='Regress', data=df_Models)
+    filename = 'Models' + str(round(modelselect, 2)) + 'B-R.png'
+    plt.savefig(filename)
+    sns.lmplot(x='Ratios_variance', y='Regress', data=df_Models)
+    filename = 'Models' + str(round(modelselect, 2)) + 'ratioVar-R.png'
+    plt.savefig(filename)
+    sns.lmplot(x='Ratios_variance', y='Bayes', data=df_Models)
+    filename = 'Models' + str(round(modelselect, 2)) + 'ratioVar-B.png'
+    plt.savefig(filename)
+    sns.lmplot(x='variance', y='Regress', data=df_Models)
+    filename = 'Models' + str(round(modelselect, 2)) + 'Var-R.png'
+    plt.savefig(filename)
+    sns.lmplot(x='standdev', y='Regress', data=df_Models)
+    filename = 'Models' + str(round(modelselect, 2)) + 'std-R.png'
+    plt.savefig(filename)
+    plt.savefig(filename)
+    sns.lmplot(x='variance', y='Bayes', data=df_Models)
+    filename = 'Models' + str(round(modelselect, 2)) + 'Var-B.png'
+    plt.savefig(filename)
+    # pdb.set_trace()
+    filename = 'Models' + str(round(modelselect,2)) + '.csv'
+    df_Models.to_csv(filename)
+    #
+    #
+    # modelselect =0.1012121212121212
+    # df_Models = pd.DataFrame(allModels[modelselect])
+    # df_Models = df_Models.T
+    # sns.lmplot(x='Bayes', y='Regress', data=df_Models)
+    # filename = 'Models' + str(round(modelselect, 2)) + 'B-R.png'
+    # plt.savefig(filename)
+    # sns.lmplot(x='Ratios_variance', y='Regress', data=df_Models)
+    # filename = 'Models' + str(round(modelselect, 2)) + 'Var-R.png'
+    # plt.savefig(filename)
+    # sns.lmplot(x='Ratios_variance', y='Bayes', data=df_Models)
+    # filename = 'Models' + str(round(modelselect, 2)) + 'Var-B.png'
+    # plt.savefig(filename)
+    # filename = 'Models' + str(round(modelselect,2)) + '.csv'
+    # df_Models.to_csv(filename)
+    #
+    # modelselect = 0.5
+    # df_Models = pd.DataFrame(allModels[modelselect])
+    # df_Models = df_Models.T
+    # sns.lmplot(x='Bayes', y='Regress', data=df_Models)
+    # filename = 'Models' + str(round(modelselect, 2)) + 'B-R.png'
+    # plt.savefig(filename)
+    # sns.lmplot(x='Ratios_variance', y='Regress', data=df_Models)
+    # filename = 'Models' + str(round(modelselect, 2)) + 'Var-R.png'
+    # plt.savefig(filename)
+    # sns.lmplot(x='Ratios_variance', y='Bayes', data=df_Models)
+    # filename = 'Models' + str(round(modelselect, 2)) + 'Var-B.png'
+    # plt.savefig(filename)
+    # filename = 'Models' + str(round(modelselect,2)) + '.csv'
+    # df_Models.to_csv(filename)
+
+
+    # save the model coeffs
+    df_STD = pd.DataFrame(allDeviation['standdev'])
+    filename = 'Deviation_STD.csv'
+    df_STD.to_csv(filename)
+
+    # save the model coeffs
+    df_var = pd.DataFrame(allDeviation['variance'])
+    filename = 'Deviation_var.csv'
+    df_var.to_csv(filename)
+
+    print('finished')
+
+if Saving:
+    # save the correlation values, p and n
+    df_corr_out = pd.DataFrame(CorrVals, index=['Comb - Eth', 'Comb - Occu', 'Eth - Occu'])
+    filename = 'Correlation_Scores.csv'
+    os.chdir("C:/Users/Thomas Dolman/Documents/UvA/MasterStage2_MingHsu/Onderzoek/Data/Overall")
+    df_corr_out.to_csv(filename)
+
+    # save the correlation values, p and n
+    df_corr_P_out = pd.DataFrame(Pvals, index=['Comb - Eth', 'Comb - Occu', 'Eth - Occu'])
+    filename = 'Correlation_Ps.csv'
+    os.chdir("C:/Users/Thomas Dolman/Documents/UvA/MasterStage2_MingHsu/Onderzoek/Data/Overall")
+    df_corr_P_out.to_csv(filename)

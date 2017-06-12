@@ -1,6 +1,7 @@
 def combineTraits(df, allTargets, allTraits, n):
     import numpy as np
     import pandas as pd
+    import warnings
 
     if n == 0:
         repeats = 3
@@ -49,7 +50,9 @@ def combineTraits(df, allTargets, allTraits, n):
             elif len(matrixTrait) == 1:
                 npMatrixTrait = [matrixTrait[0]]
 
+            warnings.simplefilter("ignore", RuntimeWarning)
             meanTrait = np.nanmean(npMatrixTrait, axis=0)
+
             df_new[Target + '_' + Trait] = meanTrait
 
     return df_new
